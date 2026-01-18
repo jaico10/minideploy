@@ -1,0 +1,56 @@
+# ---------------------------
+# Python
+# ---------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+*.db
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables (IMPORTANT)
+.env
+
+# ---------------------------
+# Celery / Redis
+# ---------------------------
+celerybeat-schedule
+celerybeat.pid
+
+# ---------------------------
+# FastAPI / Uvicorn
+# ---------------------------
+*.pid
+
+# ---------------------------
+# VS Code / IDEs
+# ---------------------------
+.vscode/
+.idea/
+*.swp
+
+# ---------------------------
+# OS files
+# ---------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------
+# Node (if you add frontend later)
+# ---------------------------
+node_modules/
+dist/
+build/
+
+# ---------------------------
+# Testing / Coverage
+# ---------------------------
+.pytest_cache/
+.coverage
+htmlcov/
