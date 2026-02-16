@@ -11,3 +11,6 @@ celery_app.conf.update(
     task_track_started=True,
     result_expires=3600
 )
+
+# ✅ IMPORTANT: register tasks inside backend
+celery_app.autodiscover_tasks(["backend"])

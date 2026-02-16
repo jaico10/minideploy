@@ -1,4 +1,4 @@
-ALLOWED_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".php"}
+ALLOWED_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".php",".html",".css"}
 
 def is_safe_code_file(path: str) -> bool:
     p = path.lower()

@@ -7,3 +7,9 @@ langchain-groq
 pydantic
 celery
 redis
+# --- LangChain ---
+langchain
+langchain-core
+langchain-community
+langchain-openai
+openai

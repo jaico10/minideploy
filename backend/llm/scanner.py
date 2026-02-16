@@ -1,7 +1,9 @@
-from backend.llm.groq_client import call_llm
+from backend.llm.llm_provider import get_llm
 from backend.config import MARKER
 
 def scan_and_mark_code(code: str) -> str:
+    llm = get_llm()
+
     prompt = f"""
 You are a Static Application Security Testing (SAST) engine.
 
@@ -17,4 +19,5 @@ CODE:
 {code}
 """.strip()
 
-    return call_llm(prompt)
+    response = llm.invoke(prompt)
+    return response.content.strip()
