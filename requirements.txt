@@ -13,3 +13,9 @@ langchain-core
 langchain-community
 langchain-openai
 openai
+# --- Auth ---
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+psycopg2-binary
+sqlalchemy

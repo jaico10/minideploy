@@ -2,7 +2,7 @@ from celery import Celery
 from backend.config import REDIS_URL
 
 celery_app = Celery(
-    "repoguardai",
+    "code_sentinel",
     broker=REDIS_URL,
     backend=REDIS_URL
 )

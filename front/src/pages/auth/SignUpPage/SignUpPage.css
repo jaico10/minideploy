@@ -1,0 +1,6 @@
+/* SignUpPage.css - Styles for Sign Up Page */
+
+/* Import shared auth styles */
+@import '../Auth.css';
+
+/* Additional styles specific to sign up page can be added here */

@@ -1,0 +1,6 @@
+/* LoginPage.css - Styles for Login Page */
+
+/* Import shared auth styles */
+@import '../Auth.css';
+
+/* Additional styles specific to login page can be added here */
