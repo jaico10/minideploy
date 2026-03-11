@@ -129,6 +129,7 @@ const CodeSentinelApp = () => {
           <Sidebar darkMode={darkMode} currentPage={currentPage} setCurrentPage={setCurrentPage} handleLogout={handleLogout} />
           <TopBar darkMode={darkMode} setDarkMode={setDarkMode} user={user} />
           {currentPage === 'dashboard' && <Dashboard darkMode={darkMode} stats={stats} scans={scans} loading={loading} setCurrentPage={setCurrentPage} />}
+          {currentPage === 'scanHistory' && <ScanHistoryPage darkMode={darkMode} scans={scans} loading={loading} setCurrentPage={setCurrentPage} />}
           {currentPage === 'remediation' && <RemediationPage darkMode={darkMode} />}
           {currentPage === 'reports' && <ReportsPage darkMode={darkMode} />}
           {currentPage === 'newScan' && <NewScanPage darkMode={darkMode} />}
@@ -580,7 +581,10 @@ const Dashboard = ({ darkMode, stats, scans, loading, setCurrentPage }) => (
     </div>
 
     <div className="table-container">
-      <h2 className="section-title">Recent Scans</h2>
+      <div className="flex-between mb-4">
+        <h2 className="section-title">Recent Scans</h2>
+        <button onClick={() => setCurrentPage('scanHistory')} className="link-btn">View All</button>
+      </div>
       <div className="table-wrapper">
         {loading ? (
           <p>Loading scans...</p>
@@ -595,7 +599,7 @@ const Dashboard = ({ darkMode, stats, scans, loading, setCurrentPage }) => (
               </tr>
             </thead>
             <tbody>
-              {scans.map(scan => (
+              {scans.slice(0, 5).map(scan => (
                 <tr key={scan.id}>
                   <td>{scan.task_id}</td>
                   <td>
@@ -618,6 +622,73 @@ const Dashboard = ({ darkMode, stats, scans, loading, setCurrentPage }) => (
           </table>
         ) : (
           <p className="page-subtitle">No scans available. Start a new scan to see results here.</p>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+const ScanHistoryPage = ({ darkMode, scans, loading, setCurrentPage }) => (
+  <div className={`dashboard ${darkMode ? 'dark' : 'light'}`}>
+    <h1 className="page-title">Scan History</h1>
+    <p className="page-subtitle">All previous security scans</p>
+
+    <div className="table-container">
+      <h2 className="section-title">All Scans ({scans.length})</h2>
+      <div className="table-wrapper">
+        {loading ? (
+          <p>Loading scan history...</p>
+        ) : scans.length > 0 ? (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Task ID</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Files</th>
+                <th>Issues</th>
+                <th>Risk</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scans.map(scan => (
+                <tr key={scan.id}>
+                  <td>{scan.task_id}</td>
+                  <td>
+                    <span className={`status-badge ${scan.status}`}>
+                      {scan.status}
+                    </span>
+                  </td>
+                  <td>{new Date(scan.created_at).toLocaleDateString()}</td>
+                  <td>{scan.total_files || 0}</td>
+                  <td>{scan.issues_count || 0}</td>
+                  <td>
+                    {scan.risk_score !== null ? (
+                      <span className={`risk-score ${scan.risk_score > 7 ? 'text-red' : scan.risk_score > 4 ? 'text-orange' : 'text-green'}`}>
+                        {scan.risk_score}/10
+                      </span>
+                    ) : 'N/A'}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={() => setCurrentPage(`scan-${scan.task_id}`)}
+                    >
+                      View Report
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="empty-state p-8 text-center">
+            <Clock size={48} className="mx-auto mb-4 opacity-50" />
+            <h3 className="text-xl font-medium mb-2">No history yet</h3>
+            <p className="text-gray-400">You haven't run any scans yet. Go to New Scan to get started.</p>
+            <button onClick={() => setCurrentPage('newScan')} className="btn btn-primary mt-4">Start First Scan</button>
+          </div>
         )}
       </div>
     </div>

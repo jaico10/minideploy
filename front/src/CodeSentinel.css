@@ -2391,13 +2391,45 @@ input {
   opacity: 0.6;
 }
 
-.auth-page.dark .form-input::placeholder {
-  color: #64748b;
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.auth-page.light .form-input::placeholder {
-  color: #94a3b8;
+.flex-center {
+  display: flex;
+  align-items: center;
 }
+
+.mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-6 { margin-bottom: 24px; }
+.mb-8 { margin-bottom: 32px; }
+
+.mr-1 { margin-right: 4px; }
+.mr-2 { margin-right: 8px; }
+
+.ml-auto { margin-left: auto; }
+
+.text-red { color: #ef4444; }
+.text-orange { color: #f97316; }
+.text-green { color: #22c55e; }
+.text-gray-400 { color: #9ca3af; }
+
+.font-medium { font-weight: 500; }
+.text-xl { font-size: 20px; }
+.text-center { text-align: center; }
+.opacity-50 { opacity: 0.5; }
+
+.p-8 { padding: 32px; }
+.bg-gray-900 { background-color: #111827; }
+.rounded-lg { border-radius: 8px; }
+
+.text-capitalize { text-transform: capitalize; }
 
 .form-input:focus {
   outline: none;
