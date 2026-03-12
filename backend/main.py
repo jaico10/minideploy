@@ -22,7 +22,7 @@ app = FastAPI(
 )
 
 # ── CORS ────────────────────────────────────────────────────────────────────
-cors_origins_raw = os.getenv("CORS_ORIGINS", '["http://localhost:5173", "http://127.0.0.1:5173", "https://frontend-production.up.railway.app"]')
+cors_origins_raw = os.getenv("CORS_ORIGINS", '["http://localhost:5173", "http://127.0.0.1:5173", "https://minideploy-production.up.railway.app"]')
 try:
     allow_origins = json.loads(cors_origins_raw)
 except Exception:
