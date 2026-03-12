@@ -53,6 +53,10 @@ class ScanOut(BaseModel):
     status: ScanStatus
     created_at: datetime
     updated_at: Optional[datetime]
+    total_files: Optional[int] = 0
+    issues_count: Optional[int] = 0
+    risk_score: Optional[float] = 0.0
+    severity: Optional[SeverityLevel] = None
 
     class Config:
         from_attributes = True

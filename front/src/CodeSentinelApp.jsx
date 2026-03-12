@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Bell, Sun, Moon, User, Shield, RefreshCw, Clock, FileText, LogOut, AlertTriangle, CheckCircle, Info, Github, Filter, Download, Play, GitBranch } from 'lucide-react';
+import ReactDiffViewer from 'react-diff-viewer-continued';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './CodeSentinel.css';
 
 // Main App Component
+import API_BASE_URL from './config';
+
 const CodeSentinelApp = () => {
   const [currentPage, setCurrentPage] = useState('landing');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -22,9 +26,18 @@ const CodeSentinelApp = () => {
 
   // Check for existing token on mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      fetchUserProfile(token);
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+
+    if (urlToken) {
+      localStorage.setItem('token', urlToken);
+      window.history.replaceState({}, document.title, "/");
+      fetchUserProfile(urlToken);
+    } else {
+      const token = localStorage.getItem('token');
+      if (token) {
+        fetchUserProfile(token);
+      }
     }
   }, []);
 
@@ -37,7 +50,7 @@ const CodeSentinelApp = () => {
       // Poll every 5 seconds to get updates on scans
       const interval = setInterval(() => {
         fetchStats();
-        fetchScans();
+        fetchScans(true);
       }, 5000);
 
       return () => clearInterval(interval);
@@ -46,7 +59,7 @@ const CodeSentinelApp = () => {
 
   const fetchUserProfile = async (token) => {
     try {
-      const response = await fetch('http://localhost:8000/auth/me', {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -70,7 +83,7 @@ const CodeSentinelApp = () => {
     if (!token) return;
 
     try {
-      const response = await fetch('http://localhost:8000/scans/dashboard/stats', {
+      const response = await fetch(`${API_BASE_URL}/scans/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -84,25 +97,32 @@ const CodeSentinelApp = () => {
     }
   };
 
-  const fetchScans = async () => {
+  const fetchScans = async (isBackgroundPoll = false) => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    setLoading(true);
+    if (!isBackgroundPoll) {
+      setLoading(true);
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/scans/', {
+      const response = await fetch(`${API_BASE_URL}/scans/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       if (response.ok) {
         const data = await response.json();
-        setScans(data);
+        // Sort by ID or created_at descending (latest first)
+        const sortedData = [...data].sort((a, b) => b.id - a.id);
+        setScans(sortedData);
       }
     } catch (error) {
       console.error('Error fetching scans:', error);
     } finally {
-      setLoading(false);
+      if (!isBackgroundPoll) {
+        setLoading(false);
+      }
     }
   };
 
@@ -120,9 +140,9 @@ const CodeSentinelApp = () => {
       {!isAuthenticated ? (
         <>
           {currentPage === 'landing' && <LandingPage setCurrentPage={setCurrentPage} darkMode={darkMode} setDarkMode={setDarkMode} />}
-          {currentPage === 'signup' && <SignUpPage setCurrentPage={setCurrentPage} />}
-          {currentPage === 'login' && <LoginPage setIsAuthenticated={setIsAuthenticated} setCurrentPage={setCurrentPage} setUser={setUser} />}
-          {currentPage === 'forgotPassword' && <ForgotPasswordPage setCurrentPage={setCurrentPage} />}
+          {currentPage === 'signup' && <SignUpPage setCurrentPage={setCurrentPage} darkMode={darkMode} />}
+          {currentPage === 'login' && <LoginPage setIsAuthenticated={setIsAuthenticated} setCurrentPage={setCurrentPage} setUser={setUser} darkMode={darkMode} />}
+          {currentPage === 'forgotPassword' && <ForgotPasswordPage setCurrentPage={setCurrentPage} darkMode={darkMode} />}
         </>
       ) : (
         <>
@@ -187,10 +207,6 @@ const TopBar = ({ darkMode, setDarkMode, user }) => (
       <button onClick={() => setDarkMode(!darkMode)} className="icon-btn">
         {darkMode ? <Sun size={20} /> : <Moon size={20} />}
       </button>
-      <button className="icon-btn notification-btn">
-        <Bell size={20} />
-        <span className="notification-badge">3</span>
-      </button>
       <button className="icon-btn">
         <User size={20} />
         {user && <span className="user-info">{user.username}</span>}
@@ -234,8 +250,7 @@ const LandingPage = ({ setCurrentPage, darkMode, setDarkMode }) => {
         <h1 className="hero-title">Scan your GitHub repo for<br />vulnerabilities using AI</h1>
         <p className="hero-subtitle">Automated security scanning with AI-powered remediation for your code repositories</p>
         <div className="hero-actions">
-          <button onClick={() => setCurrentPage('signup')} className="btn btn-primary btn-large">Start Scanning</button>
-          <button className="btn btn-secondary btn-large">View Demo</button>
+          <button onClick={() => setCurrentPage('login')} className="btn btn-primary btn-large">Start Scanning</button>
         </div>
         <div id="features" className="features-grid">
           <FeatureCard icon={<Search size={40} />} title="SAST Scan" description="Static analysis security testing for comprehensive code review" />
@@ -248,7 +263,7 @@ const LandingPage = ({ setCurrentPage, darkMode, setDarkMode }) => {
   );
 };
 
-const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser }) => {
+const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser, darkMode }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -264,7 +279,7 @@ const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser }) => {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await fetch('http://localhost:8000/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -291,7 +306,7 @@ const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser }) => {
   };
 
   return (
-    <div className="auth-page">
+    <div className={`auth-page ${darkMode ? 'dark' : 'light'}`}>
       <div className="auth-container">
         <div className="auth-header">
           <div className="logo-center">
@@ -308,7 +323,6 @@ const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser }) => {
               <label className="form-label">Email</label>
               <input
                 type="email"
-                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="form-input"
@@ -319,7 +333,6 @@ const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser }) => {
               <label className="form-label">Password</label>
               <input
                 type="password"
-                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="form-input"
@@ -335,7 +348,7 @@ const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser }) => {
               {loading ? 'Signing in...' : 'Login'}
             </button>
             <div className="divider">Or continue with</div>
-            <button type="button" className="btn btn-github btn-full">
+            <button type="button" className="btn btn-github btn-full" onClick={() => window.location.href = `${API_BASE_URL}/auth/github/login`}>
               <Github size={20} />
               Login with GitHub
             </button>
@@ -349,7 +362,7 @@ const LoginPage = ({ setIsAuthenticated, setCurrentPage, setUser }) => {
   );
 };
 
-const ForgotPasswordPage = ({ setCurrentPage }) => {
+const ForgotPasswordPage = ({ setCurrentPage, darkMode }) => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
@@ -359,7 +372,7 @@ const ForgotPasswordPage = ({ setCurrentPage }) => {
   };
 
   return (
-    <div className="auth-page">
+    <div className={`auth-page ${darkMode ? 'dark' : 'light'}`}>
       <div className="auth-container">
         <div className="auth-header">
           <div className="logo-center">
@@ -376,7 +389,6 @@ const ForgotPasswordPage = ({ setCurrentPage }) => {
                 <label className="form-label">Email</label>
                 <input
                   type="email"
-                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="form-input"
@@ -408,7 +420,7 @@ const ForgotPasswordPage = ({ setCurrentPage }) => {
   );
 };
 
-const SignUpPage = ({ setCurrentPage }) => {
+const SignUpPage = ({ setCurrentPage, darkMode }) => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -427,7 +439,7 @@ const SignUpPage = ({ setCurrentPage }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/auth/signup', {
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -456,7 +468,7 @@ const SignUpPage = ({ setCurrentPage }) => {
   };
 
   return (
-    <div className="auth-page">
+    <div className={`auth-page ${darkMode ? 'dark' : 'light'}`}>
       <div className="auth-container">
         <div className="auth-header">
           <div className="logo-center">
@@ -473,7 +485,6 @@ const SignUpPage = ({ setCurrentPage }) => {
               <label className="form-label">Name</label>
               <input
                 type="text"
-                placeholder="John Doe"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="form-input"
@@ -484,7 +495,6 @@ const SignUpPage = ({ setCurrentPage }) => {
               <label className="form-label">Email</label>
               <input
                 type="email"
-                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="form-input"
@@ -495,7 +505,6 @@ const SignUpPage = ({ setCurrentPage }) => {
               <label className="form-label">Password</label>
               <input
                 type="password"
-                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="form-input"
@@ -506,7 +515,6 @@ const SignUpPage = ({ setCurrentPage }) => {
               <label className="form-label">Confirm Password</label>
               <input
                 type="password"
-                placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="form-input"
@@ -523,7 +531,7 @@ const SignUpPage = ({ setCurrentPage }) => {
               {loading ? 'Creating Account...' : 'Sign Up'}
             </button>
             <div className="divider">Or continue with</div>
-            <button type="button" className="btn btn-github btn-full">
+            <button type="button" className="btn btn-github btn-full" onClick={() => window.location.href = `${API_BASE_URL}/auth/github/login`}>
               <Github size={20} />
               Sign up with GitHub
             </button>
@@ -537,208 +545,509 @@ const SignUpPage = ({ setCurrentPage }) => {
   );
 };
 
-const Dashboard = ({ darkMode, stats, scans, loading, setCurrentPage }) => (
-  <div className={`dashboard ${darkMode ? 'dark' : 'light'}`}>
-    <h1 className="page-title">Dashboard</h1>
-    <p className="page-subtitle">Overview of your security scans</p>
+const Dashboard = ({ darkMode, stats, scans, loading, setCurrentPage }) => {
+  const
+    chartData = React.useMemo(() => {
+      return [...scans]
+        .filter(scan => scan.status === 'completed' || scan.status === 'COMPLETED')
+        .reverse()
+        .map((scan, index) => ({
+          name: `Scan ${index + 1}`,
+          date: new Date(scan.created_at).toLocaleDateString(),
+          issues: scan.issues_count || 0,
+          risk: scan.risk_score || 0
+        }));
+    }, [scans]);
 
-    <div className="stats-grid">
-      <div className="stat-card">
-        <div className="stat-header">
-          <RefreshCw className="stat-icon blue" size={24} />
-          <span className="stat-change positive">+12%</span>
-        </div>
-        <div className="stat-value">{stats.total_scans}</div>
-        <div className="stat-label">Total Scans</div>
-      </div>
-
-      <div className="stat-card">
-        <div className="stat-header">
-          <AlertTriangle className="stat-icon red" size={24} />
-          <span className="stat-change positive">-8%</span>
-        </div>
-        <div className="stat-value">{stats.vulnerabilities_found}</div>
-        <div className="stat-label">Vulnerabilities Found</div>
-      </div>
-
-      <div className="stat-card">
-        <div className="stat-header">
-          <CheckCircle className="stat-icon green" size={24} />
-          <span className="stat-change positive">+24%</span>
-        </div>
-        <div className="stat-value">{stats.completed_scans}</div>
-        <div className="stat-label">Completed Scans</div>
-      </div>
-
-      <div className="stat-card">
-        <div className="stat-header">
-          <Clock className="stat-icon orange" size={24} />
-        </div>
-        <div className="stat-value">{stats.pending_scans}</div>
-        <div className="stat-label">Pending Scans</div>
-        <div className="stat-sublabel">{stats.pending_scans} active</div>
-      </div>
-    </div>
-
-    <div className="table-container">
-      <div className="flex-between mb-4">
-        <h2 className="section-title">Recent Scans</h2>
-        <button onClick={() => setCurrentPage('scanHistory')} className="link-btn">View All</button>
-      </div>
-      <div className="table-wrapper">
-        {loading ? (
-          <p>Loading scans...</p>
-        ) : scans.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Task ID</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scans.slice(0, 5).map(scan => (
-                <tr key={scan.id}>
-                  <td>{scan.task_id}</td>
-                  <td>
-                    <span className={`status-badge ${scan.status}`}>
-                      {scan.status}
-                    </span>
-                  </td>
-                  <td>{new Date(scan.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => setCurrentPage(`scan-${scan.task_id}`)}
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="page-subtitle">No scans available. Start a new scan to see results here.</p>
-        )}
-      </div>
-    </div>
-  </div>
-);
-
-const ScanHistoryPage = ({ darkMode, scans, loading, setCurrentPage }) => (
-  <div className={`dashboard ${darkMode ? 'dark' : 'light'}`}>
-    <h1 className="page-title">Scan History</h1>
-    <p className="page-subtitle">All previous security scans</p>
-
-    <div className="table-container">
-      <h2 className="section-title">All Scans ({scans.length})</h2>
-      <div className="table-wrapper">
-        {loading ? (
-          <p>Loading scan history...</p>
-        ) : scans.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Task ID</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Files</th>
-                <th>Issues</th>
-                <th>Risk</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scans.map(scan => (
-                <tr key={scan.id}>
-                  <td>{scan.task_id}</td>
-                  <td>
-                    <span className={`status-badge ${scan.status}`}>
-                      {scan.status}
-                    </span>
-                  </td>
-                  <td>{new Date(scan.created_at).toLocaleDateString()}</td>
-                  <td>{scan.total_files || 0}</td>
-                  <td>{scan.issues_count || 0}</td>
-                  <td>
-                    {scan.risk_score !== null ? (
-                      <span className={`risk-score ${scan.risk_score > 7 ? 'text-red' : scan.risk_score > 4 ? 'text-orange' : 'text-green'}`}>
-                        {scan.risk_score}/10
-                      </span>
-                    ) : 'N/A'}
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => setCurrentPage(`scan-${scan.task_id}`)}
-                    >
-                      View Report
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="empty-state p-8 text-center">
-            <Clock size={48} className="mx-auto mb-4 opacity-50" />
-            <h3 className="text-xl font-medium mb-2">No history yet</h3>
-            <p className="text-gray-400">You haven't run any scans yet. Go to New Scan to get started.</p>
-            <button onClick={() => setCurrentPage('newScan')} className="btn btn-primary mt-4">Start First Scan</button>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-);
-
-const RemediationPage = ({ darkMode }) => {
   return (
     <div className={`dashboard ${darkMode ? 'dark' : 'light'}`}>
-      <h1 className="page-title">AI Remediation</h1>
-      <p className="page-subtitle">AI-powered fix for security vulnerabilities</p>
+      <h1 className="page-title">Dashboard</h1>
+      <p className="page-subtitle">Overview of your security scans</p>
 
-      <div className="remediation-placeholder">
-        <div className="placeholder-content">
-          <RefreshCw size={64} className="placeholder-icon" />
-          <h3>No Vulnerability Selected</h3>
-          <p>Select a vulnerability from your scan results to view AI-generated remediation suggestions.</p>
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-header">
+            <RefreshCw className="stat-icon blue" size={24} />
+          </div>
+          <div className="stat-value">{stats.total_scans}</div>
+          <div className="stat-label">Total Scans</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-header">
+            <AlertTriangle className="stat-icon red" size={24} />
+          </div>
+          <div className="stat-value">{stats.vulnerabilities_found}</div>
+          <div className="stat-label">Vulnerabilities Found</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-header">
+            <CheckCircle className="stat-icon green" size={24} />
+          </div>
+          <div className="stat-value">{stats.completed_scans}</div>
+          <div className="stat-label">Completed Scans</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-header">
+            <Clock className="stat-icon orange" size={24} />
+          </div>
+          <div className="stat-value">{stats.pending_scans}</div>
+          <div className="stat-label">Pending Scans</div>
+          <div className="stat-sublabel">{stats.pending_scans} active</div>
         </div>
       </div>
+
+      {scans.length > 0 && (
+        <div className="table-container mb-8">
+          <h2 className="section-title mb-4">Repository Health Over Time</h2>
+          <div style={{ height: '300px', width: '100%', marginTop: '20px' }}>
+            <ResponsiveContainer>
+              <LineChart
+                data={chartData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                <XAxis dataKey="date" stroke={darkMode ? "#9ca3af" : "#6b7280"} />
+                <YAxis yAxisId="left" stroke="#ef4444" label={{ value: 'Issues', angle: -90, position: 'insideLeft', fill: "#ef4444" }} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" label={{ value: 'Risk Score', angle: 90, position: 'insideRight', fill: "#f59e0b" }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: darkMode ? '#1f2937' : '#fff',
+                    borderColor: darkMode ? '#374151' : '#e5e7eb',
+                    color: darkMode ? '#fff' : '#111827'
+                  }}
+                />
+                <Line yAxisId="left" type="monotone" dataKey="issues" name="Vulnerabilities" stroke="#ef4444" strokeWidth={3} activeDot={{ r: 8 }} />
+                <Line yAxisId="right" type="monotone" dataKey="risk" name="Risk Score (/10)" stroke="#f59e0b" strokeWidth={3} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* RECENT SCANS SECTION */}
+      <div className="table-container">
+        <div className="flex-between mb-4">
+          <h2 className="section-title">Recent Scans</h2>
+          <button onClick={() => setCurrentPage('scanHistory')} className="link-btn">View All</button>
+        </div>
+        <div className="table-wrapper">
+          {loading ? (
+            <p>Loading scans...</p>
+          ) : scans.length > 0 ? (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Task ID</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scans.slice(0, 5).map(scan => (
+                  <tr key={scan.id}>
+                    <td>{scan.task_id}</td>
+                    <td>
+                      <span className={`status-badge ${scan.status}`}>
+                        {scan.status}
+                      </span>
+                    </td>
+                    <td>{new Date(scan.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => setCurrentPage(`scan-${scan.task_id}`)}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="page-subtitle">No scans available. Start a new scan to see results here.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScanHistoryPage = ({ darkMode, scans, loading, setCurrentPage }) => {
+  const sortedScans = React.useMemo(() => [...scans].sort((a, b) => b.id - a.id), [scans]);
+  return (
+    <div className={`dashboard ${darkMode ? 'dark' : 'light'}`}>
+      <h1 className="page-title">Scan History</h1>
+      <p className="page-subtitle">All previous security scans</p>
+
+      <div className="table-container">
+        <h2 className="section-title">All Scans ({scans.length})</h2>
+        <div className="table-wrapper">
+          {loading ? (
+            <p>Loading scan history...</p>
+          ) : scans.length > 0 ? (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Task ID</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Files</th>
+                  <th>Issues</th>
+                  <th>Risk</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedScans.map(scan => (
+                  <tr key={scan.id}>
+                    <td>{scan.task_id}</td>
+                    <td>
+                      <span className={`status-badge ${scan.status}`}>
+                        {scan.status}
+                      </span>
+                    </td>
+                    <td>{new Date(scan.created_at).toLocaleDateString()}</td>
+                    <td>{scan.total_files || 0}</td>
+                    <td>{scan.issues_count || 0}</td>
+                    <td>
+                      {scan.risk_score !== null ? (
+                        <span className={`risk-score ${scan.risk_score > 7 ? 'text-red' : scan.risk_score > 4 ? 'text-orange' : 'text-green'}`}>
+                          {scan.risk_score}/10
+                        </span>
+                      ) : 'N/A'}
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => setCurrentPage(`scan-${scan.task_id}`)}
+                      >
+                        View Report
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="empty-state p-8 text-center">
+              <Clock size={48} className="mx-auto mb-4 opacity-50" />
+              <h3 className="text-xl font-medium mb-2">No history yet</h3>
+              <p className="text-gray-400">You haven't run any scans yet. Go to New Scan to get started.</p>
+              <button onClick={() => setCurrentPage('newScan')} className="btn btn-primary mt-4">Start First Scan</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RemediationPage = ({ darkMode }) => {
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIssue, setSelectedIssue] = useState(null);
+
+  useEffect(() => {
+    const fetchIssues = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/scans/issues/vulnerable`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setIssues(data);
+        }
+      } catch (error) {
+        console.error('Error fetching vulnerable issues:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchIssues();
+  }, []);
+
+  return (
+    <div className={`dashboard ${darkMode ? 'dark' : 'light'}`}>
+      <h1 className="page-title">AI Remediation Dashboard</h1>
+      <p className="page-subtitle">Instantly view and apply AI-powered code fixes for your vulnerabilities</p>
+
+      {loading ? (
+        <div className="remediation-placeholder">
+          <p>Loading vulnerable issues...</p>
+        </div>
+      ) : issues.length === 0 ? (
+        <div className="remediation-placeholder">
+          <div className="placeholder-content">
+            <CheckCircle size={64} className="placeholder-icon green" />
+            <h3>No Vulnerabilities Found!</h3>
+            <p>Your repositories are clean according to our AI scans.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="remediation-split-view">
+          <div className="remediation-sidebar">
+            <h3 className="sidebar-title">Vulnerabilities ({issues.length})</h3>
+            <div className="issues-list">
+              {issues.map(issue => (
+                <div
+                  key={issue.id}
+                  className={`issue-item ${selectedIssue?.id === issue.id ? 'active' : ''}`}
+                  onClick={() => setSelectedIssue(issue)}
+                >
+                  <div className="issue-repo-name"><Github size={12} style={{ marginRight: '4px', display: 'inline' }} /> {issue.repo_url.split('/').slice(-1)[0]}</div>
+                  <div className="issue-file-path"><FileText size={12} style={{ marginRight: '4px', display: 'inline', color: '#6b7280' }} /> {issue.file_path.split('/').slice(-1)[0]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="remediation-content">
+            {selectedIssue ? (
+              <div className="ai-fix-container">
+                <div className="ai-fix-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div className="file-info" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertTriangle size={20} color="#ef4444" />
+                    <h4 style={{ margin: 0 }}>{selectedIssue.file_path}</h4>
+                  </div>
+                  <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '13px' }}>
+                    <CheckCircle size={14} /> Accept Fix
+                  </button>
+                </div>
+
+                <div className="diff-viewer-wrapper" style={{ borderRadius: '8px', overflow: 'hidden', border: darkMode ? '1px solid #374151' : '1px solid #e5e7eb' }}>
+                  <ReactDiffViewer
+                    oldValue={selectedIssue.scanned_code}
+                    newValue={selectedIssue.fixed_code}
+                    splitView={true}
+                    useDarkTheme={darkMode}
+                    leftTitle="Vulnerable Code"
+                    rightTitle="AI Suggested Fix"
+                    styles={{
+                      variables: {
+                        dark: {
+                          diffViewerBackground: '#030712',
+                          diffViewerColor: '#FFF',
+                          addedBackground: '#064e3b',
+                          addedColor: '#a7f3d0',
+                          removedBackground: '#7f1d1d',
+                          removedColor: '#fecaca',
+                          wordAddedBackground: '#047857',
+                          wordRemovedBackground: '#b91c1c'
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="remediation-placeholder" style={{ height: '100%', marginTop: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="placeholder-content">
+                  <RefreshCw size={64} className="placeholder-icon" style={{ opacity: 0.5 }} />
+                  <h3>Select an Issue</h3>
+                  <p>Click on an issue in the sidebar to view the AI suggested remediation.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 const ReportsPage = ({ darkMode }) => {
+  const [completedScans, setCompletedScans] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCompletedScans();
+  }, []);
+
+  const fetchCompletedScans = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/scans/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCompletedScans(data.filter(s => s.status === 'completed' || s.status === 'COMPLETED'));
+      }
+    } catch (error) {
+      console.error('Error fetching scans for reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async (taskId) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/scans/${taskId}/report/pdf`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `CodeSentinel_ScanReport_${taskId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("Failed to generate PDF Report");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+    }
+  };
+
   return (
     <div className={`dashboard ${darkMode ? 'dark' : 'light'}`}>
       <div className="reports-header-row">
         <div>
-          <h1 className="page-title">Reports</h1>
-          <p className="page-subtitle">Download and manage security reports</p>
+          <h1 className="page-title">Executive Reports</h1>
+          <p className="page-subtitle">Download comprehensive PDF security reports for compliance and auditing</p>
         </div>
-        <button className="btn btn-primary">Generate New Report</button>
       </div>
 
       <div className="reports-section">
-        <h2 className="section-title">Available Reports</h2>
-        <div className="reports-placeholder">
-          <div className="placeholder-content">
-            <FileText size={64} className="placeholder-icon" />
-            <h3>No Reports Available</h3>
-            <p>Complete some scans to generate security reports for download.</p>
+        <h2 className="section-title">Available Scan Reports</h2>
+        {loading ? (
+          <div className="reports-placeholder">
+            <p>Loading reports...</p>
           </div>
-        </div>
+        ) : completedScans.length === 0 ? (
+          <div className="reports-placeholder">
+            <div className="placeholder-content">
+              <FileText size={64} className="placeholder-icon" />
+              <h3>No Reports Available</h3>
+              <p>Complete some scans in the New Scan tab to generate security reports for download.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="history-list">
+            {completedScans.map((scan) => (
+              <div key={scan.id} className="history-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="history-info">
+                  <div className="history-repo">
+                    <Github size={16} /> Task: {scan.task_id.substring(0, 8)}...
+                  </div>
+                  <div className="history-meta">
+                    <span className="meta-item"><Clock size={14} /> {new Date(scan.created_at).toLocaleString()}</span>
+                  </div>
+                  <div className="history-stats">
+                    <span className="stat-badge"><FileText size={12} /> {scan.total_files || 0} files</span>
+                    {scan.issues_count > 0 ? (
+                      <span className="stat-badge danger"><AlertTriangle size={12} /> {scan.issues_count} issues</span>
+                    ) : (
+                      <span className="stat-badge success"><CheckCircle size={12} /> Clean</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDownloadPdf(scan.task_id)}
+                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Download size={16} /> Download PDF
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
+const QueueItem = React.memo(({ job }) => {
+  const [progress, setProgress] = useState({ percent: 0, file: '' });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // Only poll if it's potentially running
+    if (job.status === 'completed' || job.status === 'failed') {
+      if (job.status === 'completed') setProgress({ percent: 100, file: '' });
+      return;
+    }
+
+    const fetchProgress = async () => {
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`${API_BASE_URL}/scans/${job.task_id}/progress`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setProgress({
+            percent: data.percent || 0,
+            file: data.file || ''
+          });
+        }
+      } catch (e) {
+        console.error('Error fetching progress:', e);
+      }
+    };
+
+    fetchProgress();
+    const intervalId = setInterval(fetchProgress, 2000);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [job.task_id, job.status]);
+
+  return (
+    <div className="queue-item">
+      <div className="queue-item-header">
+        <span className="queue-repo" style={{ fontSize: '14px', fontWeight: 500 }}>{job.task_id.substring(0, 12)}...</span>
+        <span className={`status-badge ${job.status}`}>
+          {job.status}
+        </span>
+      </div>
+      {(job.status === 'progress' || job.status === 'pending') && (
+        <div style={{ marginTop: '8px', fontSize: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#9ca3af' }}>
+            <span style={{ maxWidth: '80%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '8px' }}>
+              {progress.file ? `Scanning: ${progress.file}` : 'Starting...'}
+            </span>
+            <span>{progress.percent}%</span>
+          </div>
+          <div className="progress-bar-container" style={{ width: '100%', height: '8px', borderRadius: '9999px', overflow: 'hidden', backgroundColor: '#374151' }}>
+            <div
+              className="progress-bar"
+              style={{ width: `${progress.percent}%`, height: '100%', backgroundColor: '#3b82f6', transition: 'width 0.3s ease-out' }}
+            ></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.job.id === nextProps.job.id && prevProps.job.status === nextProps.job.status;
+});
+
 const NewScanPage = ({ darkMode }) => {
-  const [repoUrl, setRepoUrl] = useState('https://github.com/organization/repository');
+  const [repoUrl, setRepoUrl] = useState('');
+  const [githubRepos, setGithubRepos] = useState([]);
+  const [loadingRepos, setLoadingRepos] = useState(true);
   const [branch, setBranch] = useState('main');
   const [includeDependencies, setIncludeDependencies] = useState(false);
   const [queue, setQueue] = useState([]);
@@ -747,29 +1056,53 @@ const NewScanPage = ({ darkMode }) => {
 
   useEffect(() => {
     fetchQueue();
-    const interval = setInterval(fetchQueue, 5000);
+    fetchGithubRepos();
+    const interval = setInterval(() => fetchQueue(true), 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchQueue = async () => {
+  const fetchGithubRepos = async () => {
     const token = localStorage.getItem('token');
-    if (!token) return;
-
-    setLoading(true);
+    if (!token) {
+      setLoadingRepos(false);
+      return;
+    }
     try {
-      const response = await fetch('http://localhost:8000/scans/', {
+      const response = await fetch(`${API_BASE_URL}/scans/github/repos`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       if (response.ok) {
         const data = await response.json();
-        setQueue(data);
+        setGithubRepos(data);
+      }
+    } catch (error) {
+      console.error('Error fetching GitHub repos:', error);
+    } finally {
+      setLoadingRepos(false);
+    }
+  };
+  const fetchQueue = async (isBackgroundPoll = false) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    if (!isBackgroundPoll) setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/scans/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const sortedQueue = [...data].sort((a, b) => b.id - a.id);
+        setQueue(sortedQueue);
       }
     } catch (error) {
       console.error('Error fetching queue:', error);
     } finally {
-      setLoading(false);
+      if (!isBackgroundPoll) setLoading(false);
     }
   };
 
@@ -782,7 +1115,7 @@ const NewScanPage = ({ darkMode }) => {
 
     setStarting(true);
     try {
-      const response = await fetch('http://localhost:8000/scans/', {
+      const response = await fetch(`${API_BASE_URL}/scans/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -817,19 +1150,52 @@ const NewScanPage = ({ darkMode }) => {
 
       <div className="new-scan-grid">
         <div className="scan-config-card">
-          <div className="form-group">
+          <div className="form-group mb-4">
             <label className="form-label">GitHub Repository URL</label>
             <div className="input-with-icon">
               <Github size={18} className="input-icon" />
               <input
                 type="text"
                 className="form-input pl-10"
+                placeholder="https://github.com/organization/repository"
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
               />
             </div>
             <span className="input-helper">Enter the full URL of your GitHub repository</span>
           </div>
+
+          {(githubRepos.length > 0 || loadingRepos) && (
+            <div className="form-group" style={{ marginTop: '-12px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', margin: '16px 0' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: darkMode ? '#374151' : '#e5e7eb' }}></div>
+                <span style={{ padding: '0 12px', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR SELECT FROM GITHUB</span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: darkMode ? '#374151' : '#e5e7eb' }}></div>
+              </div>
+              <div className="input-with-icon">
+                <Github size={18} className="input-icon" />
+                <select
+                  className="form-select pl-10"
+                  onChange={(e) => setRepoUrl(e.target.value)}
+                  value={githubRepos.some(r => r.url === repoUrl) ? repoUrl : ""}
+                  disabled={loadingRepos}
+                >
+                  {loadingRepos ? (
+                    <option value="" disabled>Loading repositories...</option>
+                  ) : (
+                    <>
+                      <option value="" disabled>Select a repository...</option>
+                      {githubRepos.map(repo => (
+                        <option key={repo.url} value={repo.url}>
+                          {repo.name} {repo.private ? '(Private)' : ''}
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Git Branch Selection</label>
@@ -878,19 +1244,7 @@ const NewScanPage = ({ darkMode }) => {
               <p>Loading queue...</p>
             ) : queue.length > 0 ? (
               queue.map((job) => (
-                <div key={job.id} className="queue-item">
-                  <div className="queue-item-header">
-                    <span className="queue-repo">{job.task_id}</span>
-                    <span className={`status-badge ${job.status}`}>
-                      {job.status}
-                    </span>
-                  </div>
-                  {job.status === 'progress' && (
-                    <div className="progress-bar-container">
-                      <div className="progress-bar" style={{ width: `50%` }}></div>
-                    </div>
-                  )}
-                </div>
+                <QueueItem key={job.id} job={job} />
               ))
             ) : (
               <p>No scans in queue</p>
@@ -919,7 +1273,7 @@ const ScanDetailPage = ({ taskId, onBack }) => {
     if (!token) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/scans/${taskId}`, {
+      const response = await fetch(`${API_BASE_URL}/scans/${taskId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -932,6 +1286,35 @@ const ScanDetailPage = ({ taskId, onBack }) => {
       console.error('Error fetching scan details:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/scans/${taskId}/report/pdf`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scan_report_${taskId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Failed to generate report');
+      }
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      alert('Error downloading report');
     }
   };
 
@@ -948,7 +1331,14 @@ const ScanDetailPage = ({ taskId, onBack }) => {
           <h1 className="page-title">Scan Details</h1>
           <p className="page-subtitle">Task ID: {taskId}</p>
         </div>
-        <div className={`status-badge ${scan.status}`}>{scan.status}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className={`status-badge ${scan.status}`}>{scan.status}</div>
+          {(scan.status === 'completed' || scan.status === 'COMPLETED') && (
+            <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center' }} onClick={downloadPdf}>
+              <Download size={16} style={{ marginRight: '8px' }} /> Download PDF Report
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="stats-grid mb-8">
@@ -987,15 +1377,26 @@ const ScanDetailPage = ({ taskId, onBack }) => {
                 {result.vulnerable && (
                   <div className="finding-body">
                     <p className="finding-explanation">Vulnerability detected in this file. AI has suggested fixes.</p>
-                    <div className="code-diff">
-                      <div className="code-block">
-                        <label>Scanned Code:</label>
-                        <pre><code>{result.scanned_code}</code></pre>
-                      </div>
-                      <div className="code-block">
-                        <label>Fixed Code:</label>
-                        <pre><code>{result.fixed_code}</code></pre>
-                      </div>
+                    <div className="code-diff-wrapper mt-4">
+                      <ReactDiffViewer
+                        oldValue={result.scanned_code}
+                        newValue={result.fixed_code}
+                        splitView={true}
+                        useDarkTheme={darkMode}
+                        leftTitle="Vulnerable Code"
+                        rightTitle="AI Fixed Code"
+                        styles={{
+                          variables: {
+                            dark: {
+                              diffViewerBackground: '#0a0f1a',
+                              addedBackground: 'rgba(16, 185, 129, 0.15)',
+                              removedBackground: 'rgba(239, 68, 68, 0.15)',
+                              wordAddedBackground: 'rgba(16, 185, 129, 0.3)',
+                              wordRemovedBackground: 'rgba(239, 68, 68, 0.3)',
+                            }
+                          }
+                        }}
+                      />
                     </div>
                   </div>
                 )}

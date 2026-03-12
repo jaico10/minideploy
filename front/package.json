@@ -12,7 +12,9 @@
   "dependencies": {
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
+    "react-diff-viewer-continued": "^4.2.0",
     "react-dom": "^19.2.0",
+    "recharts": "^3.8.0",
     "web-vitals": "^5.1.0"
   },
   "devDependencies": {

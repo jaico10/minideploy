@@ -22,11 +22,12 @@ app = FastAPI(
 )
 
 # ── CORS ────────────────────────────────────────────────────────────────────
-cors_origins_raw = os.getenv("CORS_ORIGINS", '["http://localhost:5173", "http://127.0.0.1:5173"]')
+cors_origins_raw = os.getenv("CORS_ORIGINS", '["http://localhost:5173", "http://127.0.0.1:5173", "https://frontend-production.up.railway.app"]')
 try:
     allow_origins = json.loads(cors_origins_raw)
 except Exception:
-    allow_origins = [cors_origins_raw]
+    # Fallback for comma-separated strings if not valid JSON
+    allow_origins = [o.strip() for o in cors_origins_raw.split(",")]
 
 app.add_middleware(
     CORSMiddleware,

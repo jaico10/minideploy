@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, ArrowLeft } from 'lucide-react';
 import './LoginPage.css';
+import API_BASE_URL from '../../../config';
 
 const LoginPage = ({ darkMode, setCurrentPage, setIsAuthenticated, setUser }) => {
     const [email, setEmail] = useState('');
@@ -14,15 +15,16 @@ const LoginPage = ({ darkMode, setCurrentPage, setIsAuthenticated, setUser }) =>
         setError('');
 
         try {
-            const response = await fetch('http://localhost:8000/auth/login', {
+            const formData = new URLSearchParams();
+            formData.append('username', email);
+            formData.append('password', password);
+
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: JSON.stringify({
-                    username: email, // FastAPI OAuth2 expects username
-                    password: password,
-                }),
+                body: formData.toString(),
             });
 
             if (response.ok) {
@@ -36,7 +38,8 @@ const LoginPage = ({ darkMode, setCurrentPage, setIsAuthenticated, setUser }) =>
                 setError(errorData.detail || 'Login failed');
             }
         } catch (err) {
-            setError('Network error. Please try again.');
+            console.error('Login fetch error:', err);
+            setError(`Network error: ${err.message}. Ensure backend is running.`);
         } finally {
             setLoading(false);
         }
@@ -61,24 +64,24 @@ const LoginPage = ({ darkMode, setCurrentPage, setIsAuthenticated, setUser }) =>
                         {error && <div className="error-message">{error}</div>}
                         <div className="form-group">
                             <label className="form-label">Email</label>
-                            <input 
-                                type="email" 
-                                placeholder="you@example.com" 
-                                className="form-input" 
+                            <input
+                                type="email"
+                                placeholder="you@example.com"
+                                className="form-input"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                required 
+                                required
                             />
                         </div>
                         <div className="form-group">
                             <label className="form-label">Password</label>
-                            <input 
-                                type="password" 
-                                placeholder="••••••••" 
-                                className="form-input" 
+                            <input
+                                type="password"
+                                placeholder="••••••••"
+                                className="form-input"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                required 
+                                required
                             />
                         </div>
                         <div className="form-checkbox">

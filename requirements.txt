@@ -3,19 +3,16 @@ uvicorn
 requests
 python-dotenv
 langchain
+langchain-core
+langchain-community
 langchain-groq
 pydantic
 celery
 redis
-# --- LangChain ---
-langchain
-langchain-core
-langchain-community
-langchain-openai
-openai
-# --- Auth ---
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
 psycopg2-binary
 sqlalchemy
+reportlab
+alembic
