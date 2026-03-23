@@ -7,6 +7,9 @@ RUN npm install
 
 COPY . .
 
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build
 
 # Use a simple server to serve the static files
