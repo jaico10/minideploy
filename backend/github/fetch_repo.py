@@ -11,7 +11,7 @@ def parse_repo(repo_url: str):
     return match.groups() if match else None
 
 
-def fetch_repo_files(repo_url: str):
+def fetch_repo_files(repo_url: str, token: str = None):
     repo_info = parse_repo(repo_url)
     if not repo_info:
         raise ValueError("Invalid GitHub repository URL")
@@ -19,7 +19,7 @@ def fetch_repo_files(repo_url: str):
     owner, repo = repo_info
 
     headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
+        "Authorization": f"Bearer {token or GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
     }
 

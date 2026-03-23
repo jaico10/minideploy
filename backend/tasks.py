@@ -48,8 +48,13 @@ def scan_repo_task(self, repo_id: int, user_id: int):
         # ── 1. Mark DB row as IN PROGRESS ─────────────────────────────
         update_scan_status(db, task_id, ScanStatus.PROGRESS)
 
+        # Get user's github token if available
+        from backend.crud.user_crud import get_user_by_id
+        current_user = get_user_by_id(db, user_id)
+        token = current_user.github_access_token if current_user else None
+
         # ── 2. Fetch all code files from GitHub ───────────────────────
-        files = fetch_repo_files(repo_url)
+        files = fetch_repo_files(repo_url, token=token)
         total = len(files)
 
         results = []
