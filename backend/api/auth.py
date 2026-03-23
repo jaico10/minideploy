@@ -114,4 +114,5 @@ def github_callback(code: str, db: Session = Depends(get_db)):
     )
     
     # redirect to frontend dashboard with token in url
-    return RedirectResponse(url=f"http://localhost:5173/?token={app_token}")
+    from backend.config import FRONTEND_URL
+    return RedirectResponse(url=f"{FRONTEND_URL}/?token={app_token}")
